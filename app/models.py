@@ -5,9 +5,9 @@ class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True, index=True)
     username = db.Column(db.String(64))
-    balance_rubles = db.Column(db.Integer)
-    balance_dollars = db.Column(db.Integer)
-    car_wash = db.relationship("CarWash", backref="users", lazy=True)
+    balance_rubles = db.Column(db.Float)
+    balance_dollars = db.Column(db.Float)
+    car_wash = db.relationship("CarWash", backref="users", lazy=True, uselist=False)
 
 
 class CarWash(db.Model):
