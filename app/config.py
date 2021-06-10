@@ -2,7 +2,7 @@ import os
 
 
 class Config(object):
-    SQLALCHEMY_DATABASE_URI = "postgresql://Telegram-bot:123@db:5432/contest"
+    SQLALCHEMY_DATABASE_URI = "postgresql://tgbot:123@localhost:5432/tgdb"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
