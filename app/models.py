@@ -8,6 +8,7 @@ class User(db.Model):
     balance_rubles = db.Column(db.Float)
     balance_dollars = db.Column(db.Float)
     car_wash = db.relationship("CarWash", backref="users", lazy=True, uselist=False)
+    menu = db.Column(db.String(64))
 
 
 class CarWash(db.Model):
@@ -24,3 +25,7 @@ class Worker(db.Model):
     income = db.Column(db.Integer)
     price = db.Column(db.Integer)
     car_wash_id = db.Column(db.Integer, db.ForeignKey("carwashes.id"))
+    count = db.Column(db.Integer)
+
+
+
