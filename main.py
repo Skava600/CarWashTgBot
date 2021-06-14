@@ -24,7 +24,6 @@ def working_loop():
 
             income = 0
             for worker in user.car_wash.workers:
-
                 income += worker.income * worker.count
             user.balance_rubles += income
         db.session.commit()
@@ -32,56 +31,59 @@ def working_loop():
 
 @flask_app.route("/", methods=["POST"])
 def receive():
+
+
     if "callback_query" in request.json:
-        processing_button()
         chat_id = request.json["callback_query"]["message"]["chat"]["id"]
         message_id = request.json["callback_query"]["message"]["message_id"]
         url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/deleteMessage"
         data = {"chat_id": chat_id, "message_id": message_id}
-        requests.post(url, data=data)
-        return "GOOD button"
+        processing_button()
+    if "message" in request.json:
 
-    user_id = request.json["message"]["from"]["id"]
-    username = request.json["message"]["from"]["username"]
-    user = User.query.get(int(user_id))
-    chat_id = request.json["message"]["chat"]["id"]
-    message_id = request.json["message"]["message_id"]
-    if "text" in request.json["message"]:
-        if user is None:
+        if "text" in request.json["message"]:
 
-            if request.json["message"]["text"] == "/start":
-                user = User(id=int(user_id), username=username, balance_rubles=0, balance_dollars=0)
-                car_wash = CarWash(user_id=user_id)
-                db.session.add(user)
+            user_id = request.json["message"]["from"]["id"]
+            username = request.json["message"]["from"]["username"]
+            user = User.query.get(int(user_id))
+            chat_id = request.json["message"]["chat"]["id"]
+            message_id = request.json["message"]["message_id"]
+            url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/deleteMessage"
+            data = {"chat_id": chat_id, "message_id": message_id}
+            if user is None:
 
-                db.session.commit()
-                db.session.add(car_wash)
-                db.session.commit()
-                worker = Worker(car_wash_id=car_wash.id, income=100, name="👩 mother", count=1, price=5)
-                db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
-                                      car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=0))
-                db.session.add(worker)
+                if request.json["message"]["text"] == "/start":
+                    user = User(id=int(user_id), username=username, balance_rubles=0, balance_dollars=0)
+                    car_wash = CarWash(user_id=user_id)
+                    db.session.add(user)
 
-                db.session.commit()
-                create_menu(user_id, main_menu())
+                    db.session.commit()
+                    db.session.add(car_wash)
+                    db.session.commit()
+                    worker = Worker(car_wash_id=car_wash.id, income=100, name="👩 mother", count=1, price=5)
+                    db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
+                                          car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=0))
+                    db.session.add(worker)
+
+                    db.session.commit()
+                    create_menu(user_id, main_menu())
+                else:
+                    send_message(
+                        "Похоже вы у нас впервые. Добро пожаловать на вашу автомойку. Пропишите /start чтобы начать",
+                        user_id)
             else:
-                send_message(
-                    "Похоже вы у нас впервые. Добро пожаловать на вашу автомойку. Пропишите /start чтобы начать",
-                    user_id)
-        else:
-            if user.menu is None:
-                create_menu(user_id, main_menu())
-            elif user.menu == "Balance":
-                create_menu(user_id, balance_menu(balance_text(user)))
-            elif user.menu == "Workers":
-                create_menu(user_id, workers_menu())
-            elif user.menu == "CarWash":
-                create_menu(user_id, carwash_menu(workers_to_string(user.car_wash.workers)))
-            elif user.menu == "MainMenu":
-                create_menu(user_id, main_menu())
-        url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/deleteMessage"
-        data = {"chat_id": chat_id, "message_id": message_id}
-        requests.post(url, data=data)
+                if user.menu is None:
+                    create_menu(user_id, main_menu())
+                elif user.menu == "Balance":
+                    create_menu(user_id, balance_menu(balance_text(user)))
+                elif user.menu == "Workers":
+                    create_menu(user_id, workers_menu())
+                elif user.menu == "CarWash":
+                    create_menu(user_id, carwash_menu(workers_to_string(user.car_wash.workers)))
+                elif user.menu == "MainMenu":
+                    create_menu(user_id, main_menu())
+
+    requests.post(url, data=data)
     return "GOOD"
 
 
@@ -136,36 +138,57 @@ def processing_button():
     user_id = request.json["callback_query"]["from"]["id"]
     user = User.query.get(int(user_id))
     rdata = request.json["callback_query"]["data"]
+
+    # view rubles and dollar balance
     if rdata == "Balance":
+
         user.menu = "Balance"
         create_menu(user_id, balance_menu(balance_text(user)))
+
+    # view all workers on car wash
     elif rdata == "Workers":
+
         user.menu = "Workers"
         create_menu(user_id, workers_menu())
+
+    # button of carwash in main menu
     elif rdata == "CarWash":
+
         user.menu = "CarWash"
         create_menu(user_id, carwash_menu(workers_to_string(user.car_wash.workers)))
+
+    # Button of returning to main menu
     elif rdata == "BackMenu":
+
         user.menu = "MainMenu"
         create_menu(user_id, main_menu())
+
+    # button exchange rubles in balance menu
     elif rdata == "ExchangeRubles":
         rates = requests.get("https://www.nbrb.by/api/exrates/rates/145")
         user.balance_dollars += user.balance_rubles / rates.json()["Cur_OfficialRate"]
         user.balance_rubles = 0
         db.session.commit()
         create_menu(user_id, balance_menu(balance_text(user)))
+
+    # Buying some worker
     elif "BuyWorker" in rdata:
+
         if rdata.endswith("1"):
-            if user.balance_dollars < school_boy_worker.price:
-                send_message("Please donate dollars or exchange them")
-            else:
-
-                user.car_wash.workers
-                user.balance_dollars -= school_boy_worker.price
-
+            buy_worker("🤓 Schoolboy", user)
         db.session.commit()
-        create_menu(user_id, workers_menu())
     db.session.commit()
+
+
+def buy_worker(name, user):
+    if user.balance_dollars < school_boy_worker.price:
+        send_message("Please donate dollars or exchange them", user.id)
+    else:
+        for worker in user.car_wash.workers:
+            if worker.name == name:
+                user.balance_dollars -= school_boy_worker.price
+                worker.count += 1
+                break
 
 
 x = threading.Thread(target=working_loop)
