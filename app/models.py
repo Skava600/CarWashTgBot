@@ -9,6 +9,7 @@ class User(db.Model):
     balance_dollars = db.Column(db.Float)
     car_wash = db.relationship("CarWash", backref="users", lazy=True, uselist=False)
     menu = db.Column(db.String(64))
+    labyrint = db.Column(db.PickleType)
 
 
 class CarWash(db.Model):
@@ -26,6 +27,3 @@ class Worker(db.Model):
     price = db.Column(db.Integer)
     car_wash_id = db.Column(db.Integer, db.ForeignKey("carwashes.id"))
     count = db.Column(db.Integer)
-
-
-
