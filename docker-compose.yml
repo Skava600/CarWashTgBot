@@ -1,0 +1,39 @@
+version: "3.9"
+
+networks:
+    carwashnetwork:
+        name: carwashnetwork
+
+services:
+    carwashdb:
+        image: postgres
+        restart: always
+        environment:
+            POSTGRES_DB: carwashdb
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+        networks:
+            - carwashnetwork
+        volumes:
+            - "pgdata:/var/lib/postgresql/data"
+            
+    nginx:
+        image: skava600/nginxconfigs
+        restart: always
+        networks:
+            - carwashnetwork
+        ports:
+            - "5000:1488"
+
+    carwash:
+        environment:
+            BOT_TOKEN: "1720752774:AAFiXEDMqiJMFrYfsZsNpQK3wgUomgejVXs"
+            WEBHOOK_URL: "https://3fcb47ac8e05.ngrok.io"
+        image: skava600/carwash
+        restart: always
+        networks:
+            - carwashnetwork
+        depends_on:
+            - carwashdb
+volumes:
+        pgdata:

@@ -77,7 +77,7 @@ def receive():
                     db.session.commit()
                     db.session.add(car_wash)
                     db.session.commit()
-                    worker = Worker(car_wash_id=car_wash.id, income=100, name="👩 mother", count=1, price=5)
+                    worker = Worker(car_wash_id=car_wash.id, income=5, name="👩 mother", count=1, price=5)
                     db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
                                           car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=0))
                     db.session.add(worker)
@@ -148,10 +148,16 @@ def edit_message(message, chat_id, message_id, menu):
 
 
 def send_message(message, user_id):
+
     data = {"chat_id": user_id, "text": message}
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendMessage"
     requests.post(url, data=data)
 
+
+def send_payment(invoice):
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendInvoice"
+    requests.post(url, data=invoice)
+    c = 3
 
 def workers_to_string(workers):
 
@@ -220,8 +226,17 @@ def processing_button():
         edit_message(get_workers(), user_id, message_id, workers_menu())
         db.session.commit()
     elif "RechargeBalance" in rdata:
-
-        return
+        invoice = {
+            'chat_id': chat_id,
+            'title': 'invoice',
+            'description': 'A simple description',
+            'payload': 'test',
+            'provider_token': PROVIDER_TOKEN,
+            'start_parameter': 'start',
+            'currency': 'USD',
+            'prices': json.dumps([{'label': 'chel', 'amount': 500}])
+        }
+        send_payment(invoice)
 
     elif "left" or "right" or "up" or "down" in rdata:
         user_data = load_labyrint(user, chat_id)
@@ -306,4 +321,4 @@ def load_labyrint(user, chat_id):
 
 x = threading.Thread(target=working_loop)
 x.start()
-flask_app.run()
+flask_app.run(host='0.0.0.0')
