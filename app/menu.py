@@ -24,7 +24,8 @@ def balance_menu():
             "reply_markup": {"inline_keyboard": [[{"text": "🔙 Back", "callback_data": "BackMenu"},
                                                   {"text": "₽➡️💸 Exchange Rubles", "callback_data": "ExchangeRubles"}],
 
-                                                 [{"text": "Recharge balance(в разработке)", "callback_data": "RechargeBalance"}]]}}
+                                                 [{"text": "Recharge balance", "callback_data": "RechargeBalance"},
+                                                  {"text": "Withdraw", "callback_data": "Withdraw"}]]}}
 
 
 def game_menu():

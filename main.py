@@ -35,6 +35,8 @@ def working_loop():
 
 @flask_app.route("/", methods=["POST"])
 def receive():
+    if "pre_checkout_query" in request.json:
+        processing_payment()
     if "callback_query" in request.json:
         processing_button()
     if "message" in request.json:
@@ -141,6 +143,7 @@ def delete_message(chat_id, message_id):
 
 
 def edit_message(message, chat_id, message_id, menu):
+
     reply_murkup = json.dumps(menu["reply_markup"])
     data = {"chat_id": chat_id, "message_id": message_id, "text": message, "reply_markup": reply_murkup}
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/editMessageText"
@@ -157,7 +160,6 @@ def send_message(message, user_id):
 def send_payment(invoice):
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendInvoice"
     requests.post(url, data=invoice)
-    c = 3
 
 def workers_to_string(workers):
 
@@ -178,6 +180,17 @@ def balance_text(user):
     return f"Balance rubles BYN: {user.balance_rubles:.2f},"f" \nBalance dollars 💸: {user.balance_dollars:.2f}"
 
 
+def processing_payment():
+
+    data = {"pre_checkout_query_id": request.json["pre_checkout_query"]["id"], "ok": True}
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/answerPreCheckoutQuery"
+    user_id = request.json["pre_checkout_query"]["from"]["id"]
+    requests.post(url, data=data)
+    user = User.query.get(int(user_id))
+    user.balance_dollars += float(request.json["pre_checkout_query"]["total_amount"] / 100)
+    db.session.commit()
+
+
 def processing_button():
 
     user_id = request.json["callback_query"]["from"]["id"]
@@ -190,7 +203,7 @@ def processing_button():
     if rdata == "Balance":
 
         user.menu = "Balance"
-        edit_message(balance_text(user), user_id,message_id,  balance_menu())
+        edit_message(balance_text(user), user_id, message_id,  balance_menu())
 
     # view all workers on car wash
     elif rdata == "Workers":
@@ -223,18 +236,24 @@ def processing_button():
 
         if rdata.endswith("1"):
             buy_worker("🤓 Schoolboy", user)
-        edit_message(get_workers(), user_id, message_id, workers_menu())
+        db.session.commit()
+        return
+    elif "Withdraw" in rdata:
+        user.balance_dollars = 0
         db.session.commit()
     elif "RechargeBalance" in rdata:
         invoice = {
             'chat_id': chat_id,
-            'title': 'invoice',
-            'description': 'A simple description',
-            'payload': 'test',
+            'title': 'Receive dollars',
+            'description': 'Donate dollars to receive in-game dollars',
+            'payload': '5$',
             'provider_token': PROVIDER_TOKEN,
             'start_parameter': 'start',
+            'photo_url': 'https://im0-tub-by.yandex.net/i?id=32f08b8c351ca4a23dd2e61d4ebdb589&n=13',
+            'photo_width': 600,
+            'photo_height': 600,
             'currency': 'USD',
-            'prices': json.dumps([{'label': 'chel', 'amount': 500}])
+            'prices': json.dumps([{'label': '5#', 'amount': 500}])
         }
         send_payment(invoice)
 
