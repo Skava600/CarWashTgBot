@@ -40,8 +40,6 @@ def receive():
     if "callback_query" in request.json:
         processing_button()
     if "message" in request.json:
-        if "game" in request.json["message"]:
-            return "OK"
         if "text" in request.json["message"]:
 
             user_id = request.json["message"]["from"]["id"]
@@ -50,26 +48,7 @@ def receive():
             chat_id = request.json["message"]["chat"]["id"]
             message_id = request.json["message"]["message_id"]
 
-            if request.json["message"]["text"] == "/play":
-
-                if user.labyrint == None:
-                    map_cell = get_map_cell(cols, rows)
-
-                    user_data = {
-                        'map': map_cell,
-                        'x': 0,
-                        'y': 0
-                    }
-
-                    maps[chat_id] = user_data
-                    user.labyrint = pickle.dumps(user_data)
-                    db.session.commit()
-                else:
-                    maps[chat_id] = pickle.loads(user.labyrint)
-                    user_data = maps[chat_id]
-                create_menu(get_map_str(user_data['map'], (user_data['x'], user_data['y'])), user_id, game_menu())
-
-            elif user is None:
+            if user is None:
 
                 if request.json["message"]["text"] == "/start":
                     user = User(id=int(user_id), username=username, balance_rubles=0, balance_dollars=0)
@@ -87,10 +66,31 @@ def receive():
                     db.session.commit()
                     create_menu("Main Menu", user_id, main_menu())
                 else:
+
                     send_message(
-                        "Похоже вы у нас впервые. Добро пожаловать на вашу автомойку. Пропишите /start чтобы начать",
+                        "Looks like you are a new one in car wash. Type /start to begin",
                         user_id)
             else:
+
+                if request.json["message"]["text"] == "/play":
+
+                    if user.labyrint == None:
+                        map_cell = get_map_cell(cols, rows)
+
+                        user_data = {
+                            'map': map_cell,
+                            'x': 0,
+                            'y': 0
+                        }
+
+                        maps[chat_id] = user_data
+                        user.labyrint = pickle.dumps(user_data)
+                        db.session.commit()
+                    else:
+                        maps[chat_id] = pickle.loads(user.labyrint)
+                        user_data = maps[chat_id]
+                    create_menu(get_map_str(user_data['map'], (user_data['x'], user_data['y'])), user_id, game_menu())
+                    return "good"
 
                 if user.menu is None:
                     create_menu("Main Menu", user_id, main_menu())
