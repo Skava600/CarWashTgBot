@@ -7,6 +7,7 @@ from app import flask_app
 from app.models import *
 from flask import request
 from app import db
+import logging
 from app.config import *
 from app.game import get_map_cell
 from app.menu import *
@@ -62,7 +63,7 @@ def receive():
                     db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
                                           car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=0))
                     db.session.add(worker)
-
+                    logging.info(f"{user} registered")
                     db.session.commit()
                     create_menu("Main Menu", user_id, main_menu())
                 else:
@@ -229,6 +230,7 @@ def processing_button():
         user.balance_dollars += user.balance_rubles / rates.json()["Cur_OfficialRate"]
         user.balance_rubles = 0
         db.session.commit()
+        logging.info(f"{user} exchanged rubles")
         edit_message(balance_text(user), user_id, message_id, balance_menu())
 
     # Buying some worker
@@ -279,6 +281,7 @@ def processing_button():
         user.labyrint = pickle.dumps(user_data)
         if new_x == cols * 2 - 2 and new_y == rows * 2 - 2:
             delete_message(chat_id, message_id)
+            logging.info(f"{user} completed labyrint")
             send_message("Congratulations! You won. You recieved 5 BYN", chat_id)
             user.balance_rubles += 5
             user.labyrint = None
