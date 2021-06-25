@@ -28,7 +28,7 @@ services:
     carwash:
         environment:
             BOT_TOKEN: "1720752774:AAFiYNyLsAL3ecNxyFX4ZNmR88r6N7SJg5U"
-            WEBHOOK_URL: "https://3fcb47ac8e05.ngrok.io"
+            WEBHOOK_URL: "https://ff8df8d3d444.ngrok.io"
         image: skava600/carwash
         restart: always
         networks:

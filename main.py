@@ -1,16 +1,14 @@
-import json
 import pickle
 from time import sleep
 import threading
-import requests
 from app import flask_app
 from app.models import *
+import random
 from flask import request
 from app import db
-import logging
-from app.config import *
 from app.game import get_map_cell
 from app.menu import *
+from app.tg_api_tools import *
 
 data = {"url": WEBHOOK_URL}
 url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/setWebHook"
@@ -21,33 +19,22 @@ maps = {}
 cols, rows = 8, 8
 
 
-def working_loop():
-    while True:
-        sleep(3600)
-        users = User.query.all()
-        for user in users:
-
-            income = 0
-            for worker in user.car_wash.workers:
-                income += worker.income * worker.count
-            user.balance_rubles += income
-        db.session.commit()
-
-
 @flask_app.route("/", methods=["POST"])
 def receive():
+    log(request.json)
     if "pre_checkout_query" in request.json:
         processing_payment()
     if "callback_query" in request.json:
         processing_button()
     if "message" in request.json:
+        chat_id = request.json["message"]["chat"]["id"]
+        message_id = request.json["message"]["message_id"]
         if "text" in request.json["message"]:
 
             user_id = request.json["message"]["from"]["id"]
             username = request.json["message"]["from"]["username"]
             user = User.query.get(int(user_id))
-            chat_id = request.json["message"]["chat"]["id"]
-            message_id = request.json["message"]["message_id"]
+
 
             if user is None:
 
@@ -62,8 +49,9 @@ def receive():
                     worker = Worker(car_wash_id=car_wash.id, income=5, name="👩 mother", count=1, price=5)
                     db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
                                           car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=0))
+
                     db.session.add(worker)
-                    logging.info(f"{user} registered")
+                    log(f"{username}: {user.id} registered")
                     db.session.commit()
                     create_menu("Main Menu", user_id, main_menu())
                 else:
@@ -75,7 +63,7 @@ def receive():
 
                 if request.json["message"]["text"] == "/play":
 
-                    if user.labyrint == None:
+                    if user.labyrint is None:
                         map_cell = get_map_cell(cols, rows)
 
                         user_data = {
@@ -93,74 +81,26 @@ def receive():
                     create_menu(get_map_str(user_data['map'], (user_data['x'], user_data['y'])), user_id, game_menu())
                     return "good"
 
-                if user.menu is None:
-                    create_menu("Main Menu", user_id, main_menu())
+                if request.json["message"]["text"] == "/menu":
+                    if user.menu is None:
+                        create_menu("Main Menu", user_id, main_menu())
 
-                elif user.menu == "Balance":
-                    create_menu(balance_text(user), user_id, balance_menu())
+                    elif user.menu == "Balance":
+                        create_menu(balance_text(user), user_id, balance_menu())
 
-                elif user.menu == "Workers":
-                    create_menu(get_workers(), user_id, workers_menu())
+                    elif user.menu == "Workers":
+                        create_menu(get_workers(), user_id, workers_menu())
 
-                elif user.menu == "CarWash":
-                    create_menu(workers_to_string(user.car_wash.workers), user_id, carwash_menu() )
+                    elif user.menu == "CarWash":
+                        create_menu(workers_to_string(user.car_wash.workers), user_id, carwash_menu() )
 
-                elif user.menu == "MainMenu":
-                    create_menu("Main Menu", user_id, main_menu())
+                    elif user.menu == "MainMenu":
+                        create_menu("Main Menu", user_id, main_menu())
 
-            delete_message(chat_id, message_id)
+        delete_message(chat_id, message_id)
 
     return "GOOD"
 
-
-def create_menu(message, user_id, menu):
-    headers = {"Content-type": "application/json"}
-    data = {"chat_id": user_id, "text": message}
-    data.update(menu)
-    data = json.dumps(data)
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, headers=headers, data=data)
-
-
-def create_button(message, user_id, callback_data):
-    headers = {"Content-type": "application/json"}
-    data = {"chat_id": user_id,
-            "text": message,
-            "reply_markup": {"inline_keyboard":
-                                 [[{"text": "nig", "callback_data": callback_data}]]}}
-
-    data = json.dumps(data)
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendMessage"
-    res = requests.post(url, headers=headers, data=data)
-    print(res)
-    pass
-
-
-def delete_message(chat_id, message_id):
-
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/deleteMessage"
-    data = {"chat_id": chat_id, "message_id": message_id}
-    requests.post(url, data=data)
-
-
-def edit_message(message, chat_id, message_id, menu):
-
-    reply_murkup = json.dumps(menu["reply_markup"])
-    data = {"chat_id": chat_id, "message_id": message_id, "text": message, "reply_markup": reply_murkup}
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/editMessageText"
-    requests.post(url, data=data)
-
-
-def send_message(message, user_id):
-
-    data = {"chat_id": user_id, "text": message}
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data=data)
-
-
-def send_payment(invoice):
-    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/sendInvoice"
-    requests.post(url, data=invoice)
 
 def workers_to_string(workers):
 
@@ -230,7 +170,7 @@ def processing_button():
         user.balance_dollars += user.balance_rubles / rates.json()["Cur_OfficialRate"]
         user.balance_rubles = 0
         db.session.commit()
-        logging.info(f"{user} exchanged rubles")
+        log(f"{user.username}:{user.id} exchanged rubles")
         edit_message(balance_text(user), user_id, message_id, balance_menu())
 
     # Buying some worker
@@ -243,6 +183,42 @@ def processing_button():
     elif "Withdraw" in rdata:
         user.balance_dollars = 0
         db.session.commit()
+
+    elif "Lottery" in rdata:
+
+        if "Lottery" == rdata:
+
+            user.Menu = "Lottery"
+            edit_message("Lotteries🧾:\n"
+                         f"1. Great Lottery:Every minute. Contribution - {simple_lottery.contribution}. Winning all bank\n"
+                         f"2. WorkeR Lottery Every hour. Contribution - {worker_lottery.contribution}. Winning worker with stats: income - "
+                         f"{worker_lottery.contribution }", chat_id, message_id, lottery_menu())
+            return "good"
+
+        elif rdata.endswith("1"):
+
+            lottery = Lottery.query.filter(Lottery.name == simple_lottery.name).first()
+        elif rdata.endswith("2"):
+
+            lottery = Lottery.query.filter(Lottery.name == worker_lottery.name).first()
+        if user.balance_dollars >= lottery.contribution:
+
+            for userLot in lottery.users:
+
+                if userLot.user_id == user_id:
+
+                    send_message("You already take part in this lottery", user_id)
+                    return "already exist in lottery"
+            send_message(f"You successfully registered at {lottery.name}", user_id)
+            user.balance_dollars -= lottery.contribution
+            lottery.users.append(UserLotteryAssociation(lottery_id=lottery.id, user_id=user_id))
+            db.session.commit()
+        else:
+
+            send_message("Not enough money for lottery", user_id)
+        return "good"
+
+
     elif "RechargeBalance" in rdata:
         invoice = {
             'chat_id': chat_id,
@@ -259,7 +235,7 @@ def processing_button():
         }
         send_payment(invoice)
 
-    elif "left" or "right" or "up" or "down" in rdata:
+    elif ("left" or "right" or "up" or "down") == rdata:
         user_data = load_labyrint(user, chat_id)
         new_x, new_y = user_data['x'], user_data['y']
 
@@ -281,7 +257,7 @@ def processing_button():
         user.labyrint = pickle.dumps(user_data)
         if new_x == cols * 2 - 2 and new_y == rows * 2 - 2:
             delete_message(chat_id, message_id)
-            logging.info(f"{user} completed labyrint")
+            log(f"{user.username}:{user.id} completed labyrint")
             send_message("Congratulations! You won. You recieved 5 BYN", chat_id)
             user.balance_rubles += 5
             user.labyrint = None
@@ -298,15 +274,30 @@ def get_workers():
            f"{school_boy_worker.price}💸\n\t"    f"--Income per minute - {school_boy_worker.income} BYN"
 
 
+def log(message:str):
+    print(message)
+
+
 def buy_worker(name, user):
     if user.balance_dollars < school_boy_worker.price:
+
         send_message("Please donate dollars or exchange them", user.id)
     else:
-        for worker in user.car_wash.workers:
-            if worker.name == name:
-                user.balance_dollars -= school_boy_worker.price
-                worker.count += 1
-                break
+        join_request = db.session.query(CarWash, Worker).outerjoin(CarWash, Worker.car_wash_id == CarWash.id).\
+            filter(CarWash.user_id == user.id, Worker.name == name).first()
+        if join_request is None:
+            worker = None
+            carwash = None
+        else:
+            carwash, worker = join_request
+
+        if carwash is None and worker is None:
+            db.session.add(Worker(price=school_boy_worker.price, income=school_boy_worker.income,
+                                  car_wash_id=user.car_wash.id, name=school_boy_worker.name, count=1))
+            return
+        user.balance_dollars -= worker.price
+        worker.count += 1
+        log(f"{user.username}:{user.id} bought a {name}")
 
 
 def get_map_str(map_cell, player):
@@ -322,6 +313,31 @@ def get_map_str(map_cell, player):
         map_str += "\n"
 
     return map_str
+
+
+
+def working_loop():
+    while True:
+        sleep(3600)
+        users = User.query.all()
+        for user in users:
+
+            income = 0
+            for worker in user.car_wash.workers:
+                income += worker.income * worker.count
+            user.balance_rubles += income
+        db.session.commit()
+
+
+def async_tools_start():
+    threading_lottery_1 = threading.Thread(target=a_simple_lottery,
+                                           kwargs={'lottery_prot': simple_lottery, 'interval': 60})
+    threading_lottery_1.start()
+    threading_lottery_2 = threading.Thread(target=a_simple_lottery,
+                                           kwargs={'lottery_prot': worker_lottery, 'interval': 360})
+    threading_lottery_2.start()
+    threading_income = threading.Thread(target=working_loop)
+    threading_income.start()
 
 
 def load_labyrint(user, chat_id):
@@ -341,6 +357,47 @@ def load_labyrint(user, chat_id):
         maps[chat_id] = pickle.loads(user.labyrint)
         return maps[chat_id]
 
-x = threading.Thread(target=working_loop)
-x.start()
+
+def a_simple_lottery(lottery_prot, interval):
+    while True:
+
+        if len(Lottery.query.filter(Lottery.name == lottery_prot.name).all()) == 0:
+            db.session.add(lottery_prot)
+            db.session.commit()
+        lottery = Lottery.query.filter(Lottery.name == lottery_prot.name).first()
+        if len(lottery.users) > 1:
+            winner = random.randint(0, len(lottery.users) - 1)
+            user = User.query.get(int(lottery.users[winner].user_id))
+            if lottery_prot.name == simple_lottery.name:
+                jackpot = len(lottery.users) * lottery.contribution
+
+                user.balance_dollars += jackpot
+                send_message(f"Congratulations 👏. You won {jackpot} dollars", user.id)
+            elif lottery_prot.name == worker_lottery.name:
+                send_message(f"Congratulations 👏. You won 👷 Super Worker. Check your carwash", user.id)
+                join_request = db.session.query(CarWash, Worker).outerjoin(CarWash, Worker.car_wash_id == CarWash.id). \
+                    filter(CarWash.user_id == user.id, Worker.name == "👷 Super Worker").first()
+                if join_request is None:
+                    worker = None
+                    carwash = None
+                else:
+                    carwash, worker = join_request
+
+                if carwash is None and worker is None:
+                    db.session.add(Worker(car_wash_id=user.car_wash.id, income=lottery.contribution, name="👷 Super Worker", count=1, price=0))
+                    return
+                worker.count += 1
+
+            log(f"{user.username}:{user.id} won a {lottery.name}")
+            UserLotteryAssociation.query.filter(UserLotteryAssociation.lottery_id == lottery.id).delete()
+            Lottery.query.filter(Lottery.name == lottery_prot.name).delete()
+            db.session.add(lottery_prot)
+            db.session.commit()
+        else:
+            for user_as in lottery.users:
+                send_message(f"{lottery_prot.name} postponed on {interval / 60} minutes", user_as.user_id)
+        sleep(interval)
+
+
+async_tools_start()
 flask_app.run(host='0.0.0.0')
