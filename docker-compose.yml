@@ -23,7 +23,7 @@ services:
         networks:
             - carwashnetwork
         ports:
-            - "5000:1488"
+            - "5000:1222"
 
     carwash:
         environment:
